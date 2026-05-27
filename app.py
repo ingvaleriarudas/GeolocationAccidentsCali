@@ -458,8 +458,12 @@ def upload_file():
     if not file.filename or not file.filename.lower().endswith(".csv"):
         return jsonify({"error": "Solo se aceptan archivos CSV"}), 400
 
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], "accidents.csv")
-    file.save(filepath)
+    try:
+        file.save(filepath)
+    except Exception as e:
+        return jsonify({"error": f"No se pudo guardar el archivo: {e}"}), 400
 
     try:
         df = read_csv_smart(filepath)
