@@ -12,14 +12,15 @@ from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 import requests as http_req
 
 app = Flask(__name__)
-app.config["UPLOAD_FOLDER"] = "uploads"
-app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
+UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "/tmp/moto_cali")
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-CACHE_FILE  = "uploads/geocode_cache.json"
-RESULT_FILE = "uploads/result.json"
-STATUS_FILE = "uploads/status.json"
+CACHE_FILE  = os.path.join(UPLOAD_FOLDER, "geocode_cache.json")
+RESULT_FILE = os.path.join(UPLOAD_FOLDER, "result.json")
+STATUS_FILE = os.path.join(UPLOAD_FOLDER, "status.json")
 
 geocoder = Nominatim(user_agent="MotoCalyAnalyzer_v4", timeout=10)
 
@@ -458,7 +459,7 @@ def upload_file():
     if not file.filename or not file.filename.lower().endswith(".csv"):
         return jsonify({"error": "Solo se aceptan archivos CSV"}), 400
 
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], "accidents.csv")
     try:
         file.save(filepath)
