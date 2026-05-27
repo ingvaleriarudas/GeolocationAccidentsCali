@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Análisis de Accidentes de Motos — Cali, Colombia</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <span class="header-icon">🏍️</span>
+      <div class="header-title">
+        <h1>Análisis de Accidentes de Motos</h1>
+        <p>Cali, Colombia — Sistema de Análisis Geoespacial</p>
+      </div>
+    </div>
+    <span class="header-badge" id="record-count">Sin datos</span>
+  </header>
+
+  <div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+      <!-- TABS -->
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="upload">📂 Datos</button>
+        <button class="tab-btn" data-tab="stats">📊 Resumen</button>
+        <button class="tab-btn" data-tab="roads">🛣️ Vías</button>
+        <button class="tab-btn" data-tab="filters">🔍 Filtros</button>
+      </div>
+
+      <!-- TAB: UPLOAD -->
+      <div class="tab-content active" id="tab-upload">
+        <div class="section-inner">
+          <div class="upload-zone" id="upload-zone">
+            <div class="upload-icon">📂</div>
+            <p id="upload-label">Arrastra tu archivo CSV aquí</p>
+            <span>o haz clic para seleccionar</span>
+            <input type="file" id="file-input" accept=".csv" />
+          </div>
+          <button class="btn-upload" id="btn-upload" disabled>Procesar CSV</button>
+          <div class="progress-container" id="progress-container">
+            <div class="progress-label" id="progress-label">Geocodificando...</div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progress-bar"></div>
+            </div>
+            <div class="progress-eta" id="progress-eta"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: STATS -->
+      <div class="tab-content" id="tab-stats">
+        <div class="section-inner">
+          <div class="stat-card blue">
+            <span class="stat-icon">🏍️</span>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-total">—</div>
+              <div class="stat-label">Total motos (filtradas)</div>
+            </div>
+          </div>
+          <div class="stat-card orange">
+            <span class="stat-icon">📍</span>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-geocoded">—</div>
+              <div class="stat-label">Geocodificados</div>
+            </div>
+          </div>
+          <div class="stat-card red">
+            <span class="stat-icon">💀</span>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-fallecidos">—</div>
+              <div class="stat-label">Con fallecido</div>
+            </div>
+          </div>
+          <div class="stat-card yellow">
+            <span class="stat-icon">🤕</span>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-lesionados">—</div>
+              <div class="stat-label">Con lesionado</div>
+            </div>
+          </div>
+          <div class="stat-card green">
+            <span class="stat-icon">🗺️</span>
+            <div class="stat-info">
+              <div class="stat-label">Comuna más crítica</div>
+              <div class="stat-sub" id="stat-top-comuna">Sin datos</div>
+            </div>
+          </div>
+          <div class="stat-card purple">
+            <span class="stat-icon">💥</span>
+            <div class="stat-info">
+              <div class="stat-label">Tipo más frecuente</div>
+              <div class="stat-sub" id="stat-top-tipo">Sin datos</div>
+            </div>
+          </div>
+
+          <h4 class="section-title">Top 5 Comunas Críticas</h4>
+          <ul class="top5-list" id="top5-list">
+            <li class="top5-empty">Carga un CSV para ver el ranking</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- TAB: ROADS (TRAZABILIDAD) -->
+      <div class="tab-content" id="tab-roads">
+        <div class="section-inner">
+          <div class="traceability-info">
+            <div class="trace-badge">🔬 Análisis de trazabilidad</div>
+            <p class="trace-desc">
+              Cruza la ubicación de los accidentes con datos de infraestructura vial de
+              <strong>OpenStreetMap</strong> para identificar si el estado de las vías
+              es un factor de riesgo.
+            </p>
+          </div>
+
+          <button class="btn-hotspots" id="btn-load-hotspots">
+            📊 Cargar puntos críticos
+          </button>
+
+          <div id="hotspots-container">
+            <p class="hotspots-empty">Presiona el botón para analizar los puntos más peligrosos</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: FILTERS -->
+      <div class="tab-content" id="tab-filters">
+        <div class="section-inner">
+          <div class="filter-group">
+            <label>Fecha desde</label>
+            <input type="date" id="filter-date-from" />
+          </div>
+          <div class="filter-group">
+            <label>Fecha hasta</label>
+            <input type="date" id="filter-date-to" />
+          </div>
+          <div class="filter-group">
+            <label>Comuna</label>
+            <select id="filter-comuna">
+              <option value="">Todas las comunas</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Tipo de accidente</label>
+            <select id="filter-tipo">
+              <option value="">Todos los tipos</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Severidad</label>
+            <select id="filter-severidad">
+              <option value="">Todas</option>
+              <option value="Fallecido">Con fallecido</option>
+              <option value="Lesionado">Con lesionado</option>
+              <option value="Solo daños">Solo daños</option>
+              <option value="Negativo">Negativo</option>
+            </select>
+          </div>
+          <button class="btn-filter" id="btn-apply-filter">Aplicar filtros</button>
+          <button class="btn-filter secondary" id="btn-clear-filter">Limpiar filtros</button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- MAP -->
+    <div class="map-container">
+      <div id="map"></div>
+
+      <div class="map-controls">
+        <button class="map-btn active" id="btn-heat">🔥 Calor</button>
+        <button class="map-btn" id="btn-markers">📍 Marcadores</button>
+        <button class="map-btn" id="btn-comunas">🗺️ Comunas</button>
+        <button class="map-btn" id="btn-center">⊙ Centrar</button>
+      </div>
+
+      <!-- SEVERITY LEGEND -->
+      <div class="map-legend">
+        <h4>Severidad</h4>
+        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div><span>Fallecido</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div><span>Lesionado</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#eab308"></div><span>Solo daños</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#6b7280"></div><span>Negativo</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:none;border:2px solid #1e88e5"></div><span>Comunas</span></div>
+      </div>
+
+      <div class="no-data-msg" id="no-data-msg">
+        <div class="big-icon">🗺️</div>
+        <h3>Cargue un archivo CSV</h3>
+        <p>Los accidentes de motos aparecerán aquí</p>
+      </div>
+
+      <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loading-text">Procesando datos...</div>
+        <div class="loading-sub" id="loading-sub">Un momento por favor</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROAD QUALITY PANEL (slide-in) -->
+  <div class="road-panel" id="road-panel">
+    <div class="road-panel-header">
+      <span>🛣️ Estado de la vía</span>
+      <button id="road-panel-close">✕</button>
+    </div>
+    <div class="road-panel-addr" id="road-panel-addr"></div>
+    <div class="road-panel-body" id="road-panel-body">
+      <div class="spinner small"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

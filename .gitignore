@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+uploads/accidents.csv
+uploads/result.json
+uploads/status.json
+.env
+*.zip
