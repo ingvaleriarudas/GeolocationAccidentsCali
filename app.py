@@ -155,6 +155,23 @@ get_vehicle_col = lambda df: find_col(df,
     partial=["veh"])
 
 
+def has_coords(df: pd.DataFrame) -> bool:
+    """Devuelve True si el CSV ya trae columnas lat y lon con datos válidos."""
+    lat_col = find_col(df, ["lat", "LAT", "Lat", "latitude", "LATITUDE"])
+    lon_col = find_col(df, ["lon", "LON", "Lon", "lng", "LNG", "longitude", "LONGITUDE"])
+    if not lat_col or not lon_col:
+        return False
+    sample = df[[lat_col, lon_col]].dropna().head(10)
+    if sample.empty:
+        return False
+    try:
+        lats = pd.to_numeric(sample[lat_col], errors="coerce").dropna()
+        lons = pd.to_numeric(sample[lon_col], errors="coerce").dropna()
+        return len(lats) >= 3 and len(lons) >= 3
+    except Exception:
+        return False
+
+
 def filter_motos(df: pd.DataFrame) -> pd.DataFrame:
     col = get_vehicle_col(df)
     if not col:
@@ -318,6 +335,56 @@ def geocode_worker(df, addr_col, date_col, type_col, sev_col, vehicle_col):
     })
 
 
+# ── Direct loader for pre-geocoded CSVs ───────────────────────
+
+def direct_load_worker(df, addr_col, date_col, type_col, sev_col, vehicle_col,
+                       lat_col, lon_col):
+    """Construye result.json directamente desde columnas lat/lon ya presentes."""
+    total_rows = len(df)
+    write_status({"state": "geocoding", "total_unique": total_rows,
+                  "total_rows": total_rows, "geocoded_unique": 0,
+                  "geocoded_records": 0})
+    records = []
+    for _, row in df.iterrows():
+        try:
+            lat = float(str(row.get(lat_col, "") or "").strip())
+            lon = float(str(row.get(lon_col, "") or "").strip())
+        except (ValueError, TypeError):
+            continue
+        if not _in_cali(lat, lon):
+            continue
+        addr  = str(row.get(addr_col,    "") or "").strip() if addr_col  else ""
+        fecha = str(row.get(date_col,    "") or "")         if date_col  else ""
+        tipo  = str(row.get(type_col,    "") or "")         if type_col  else ""
+        sev   = str(row.get(sev_col,     "") or "")         if sev_col   else ""
+        veh   = str(row.get(vehicle_col, "") or "")         if vehicle_col else ""
+        records.append({
+            "lat":       lat,
+            "lon":       lon,
+            "fecha":     fecha,
+            "direccion": addr,
+            "tipo":      _normalize_type(tipo),
+            "severidad": _normalize_severity(sev),
+            "vehiculos": veh,
+        })
+
+    summary = {
+        "total_filtered": total_rows,
+        "total_unique_addresses": total_rows,
+        "geocoded": len(records),
+        "mode": "pre-geocoded",
+    }
+    save_result(records, summary)
+    write_status({
+        "state": "done",
+        "total_unique": total_rows,
+        "total_rows": total_rows,
+        "geocoded_unique": total_rows,
+        "geocoded_records": len(records),
+        "summary": summary,
+    })
+
+
 # ── Road quality via Overpass API ──────────────────────────────
 
 SURFACE_ES = {
@@ -416,6 +483,28 @@ def upload_file():
     if os.path.exists(RESULT_FILE):
         os.remove(RESULT_FILE)
 
+    # ── Detectar si el CSV ya viene pre-geocodificado ──────────
+    pre_geocoded = has_coords(df)
+    lat_col = find_col(df, ["lat", "LAT", "Lat", "latitude", "LATITUDE"])
+    lon_col = find_col(df, ["lon", "LON", "Lon", "lng", "LNG", "longitude", "LONGITUDE"])
+
+    if pre_geocoded:
+        write_status({"state": "starting", "total_rows": len(df),
+                      "mode": "pre-geocoded"})
+        threading.Thread(
+            target=direct_load_worker,
+            args=(df, addr_col, date_col, type_col, sev_col, vehicle_col,
+                  lat_col, lon_col),
+            daemon=True,
+        ).start()
+        return jsonify({
+            "success": True,
+            "total_filtered": len(df),
+            "mode": "pre-geocoded",
+            "message": "CSV pre-geocodificado detectado — cargando coordenadas directamente",
+        })
+
+    # ── CSV sin coordenadas: geocodificar con Nominatim ────────
     write_status({"state": "starting", "total_rows": len(df)})
     threading.Thread(
         target=geocode_worker,
@@ -426,6 +515,7 @@ def upload_file():
     return jsonify({
         "success": True,
         "total_filtered": len(df),
+        "mode": "nominatim",
         "message": "Geocodificación Nominatim iniciada (1 req/seg)",
     })
 
