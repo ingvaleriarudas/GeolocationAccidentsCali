@@ -4,7 +4,8 @@ Geocodificación: Nominatim (geopy) con caché persistente.
 Trazabilidad vial: Overpass API (OpenStreetMap).
 """
 
-import os, json, time, hashlib, threading
+import os
+import json, json, time, hashlib, threading
 import pandas as pd
 from flask import Flask, render_template, request, jsonify
 from geopy.geocoders import Nominatim
@@ -26,11 +27,8 @@ geocoder = Nominatim(user_agent="MotoCalyAnalyzer_v4", timeout=10)
 
 MOTO_KW = ["MOTO", "MOTOCICLETA", "MOTOCARRO"]
 
-COMUNAS_URL = (
-    "https://geoportal.cali.gov.co/agserver/rest/services/IDESC/"
-    "dapm_capas_base_202309281633/FeatureServer/2/query"
-    "?where=1%3D1&outFields=*&f=geojson"
-)
+# GeoJSON local de comunas (convertido desde ESRI MAGNA-SIRGAS wkid 6249)
+COMUNAS_GEOJSON = os.path.join(os.path.dirname(__file__), "static", "comunas_cali.geojson")
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
@@ -546,9 +544,8 @@ def get_data():
 @app.route("/comunas")
 def get_comunas():
     try:
-        r = http_req.get(COMUNAS_URL, timeout=20)
-        r.raise_for_status()
-        return jsonify(r.json())
+        with open(COMUNAS_GEOJSON, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
     except Exception as e:
         return jsonify({"error": str(e), "type": "FeatureCollection", "features": []}), 200
 
