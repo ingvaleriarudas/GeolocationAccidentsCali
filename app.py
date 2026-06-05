@@ -550,6 +550,17 @@ def get_comunas():
         return jsonify({"error": str(e), "type": "FeatureCollection", "features": []}), 200
 
 
+@app.route("/camaras")
+def get_camaras():
+    try:
+        path = os.path.join(os.path.dirname(__file__), "static", "camaras_fotodeteccion.json")
+        with open(path, "r", encoding="utf-8") as f:
+            camaras = json.load(f)
+        return jsonify({"camaras": camaras})
+    except Exception as e:
+        return jsonify({"camaras": [], "error": str(e)}), 200
+
+
 @app.route("/road_quality")
 def road_quality():
     try:
