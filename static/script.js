@@ -12,9 +12,11 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19,
 }).addTo(map);
 
-let heatLayer    = null;
-let markersLayer = L.layerGroup().addTo(map);
-let comunasLayer = null;
+let heatLayer     = null;
+let markersLayer  = L.layerGroup().addTo(map);
+let comunasLayer  = null;
+let camarasLayer  = L.layerGroup().addTo(map);
+let showCamaras   = true;
 
 let allRecords = [], filteredRecords = [];
 let comunasData = null, communeNames = [];
@@ -524,9 +526,72 @@ function startPolling(totalFiltered) {
 
 function stopPolling() { if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; } }
 
+
+// ── Cámaras fotodetección ─────────────────────────────────────
+const CAM_ICONS = {
+  'Operando':             { color: '#16a34a', emoji: '📷' },
+  'Autorizada instalar':  { color: '#0288d1', emoji: '🔧' },
+  'Renovada - Expirada':  { color: '#f97316', emoji: '⚠️' },
+  'Vencida':              { color: '#ef4444', emoji: '❌' },
+};
+
+function camIcon(estado) {
+  const cfg = CAM_ICONS[estado] || { color: '#6b7280', emoji: '📷' };
+  return L.divIcon({
+    className: '',
+    html: `<div style="background:${cfg.color};width:22px;height:22px;border-radius:50%;
+           display:flex;align-items:center;justify-content:center;font-size:12px;
+           border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)">${cfg.emoji}</div>`,
+    iconSize: [22, 22], iconAnchor: [11, 11],
+  });
+}
+
+async function loadCamaras() {
+  try {
+    const res = await fetch('/camaras');
+    const data = await res.json();
+    camarasLayer.clearLayers();
+    if (!data.camaras?.length) return;
+    data.camaras.forEach(c => {
+      const m = L.marker([c.lat, c.lon], { icon: camIcon(c.estado) });
+      m.bindPopup(`
+        <div style="font-family:Inter,sans-serif;min-width:200px">
+          <div style="font-weight:700;margin-bottom:6px;font-size:13px">📷 Cámara Fotodetección</div>
+          <table style="width:100%;font-size:11px;border-collapse:collapse">
+            <tr><td style="color:#546e7a;padding:2px 0">Dirección</td><td style="font-weight:600">${c.direccion}</td></tr>
+            <tr><td style="color:#546e7a;padding:2px 0">Tecnología</td><td>${c.tecnologia}</td></tr>
+            <tr><td style="color:#546e7a;padding:2px 0">Instalación</td><td>${c.instalacion}</td></tr>
+            <tr><td style="color:#546e7a;padding:2px 0">Estado</td>
+                <td><span style="background:${(CAM_ICONS[c.estado]||{color:'#888'}).color};color:#fff;
+                    padding:1px 6px;border-radius:8px;font-size:10px">${c.estado}</span></td></tr>
+            ${c.velocidad ? `<tr><td style="color:#546e7a;padding:2px 0">Velocidad</td><td>${c.velocidad} km/h</td></tr>` : ''}
+            ${c.infracciones ? `<tr><td style="color:#546e7a;padding:2px 0">Infracciones</td><td style="font-size:10px">${c.infracciones}</td></tr>` : ''}
+          </table>
+        </div>`);
+      camarasLayer.addLayer(m);
+    });
+    const total = data.camaras.length;
+    const op = data.camaras.filter(c => c.estado === 'Operando').length;
+    const el = $('stat-camaras');
+    if (el) el.textContent = `${op} / ${total}`;
+    toast(`📷 ${total} cámaras cargadas (${op} operando)`, 'success', 4000);
+  } catch(e) {
+    console.warn('No se pudieron cargar cámaras:', e);
+  }
+}
+
+function toggleCamaras() {
+  showCamaras = !showCamaras;
+  if (showCamaras) camarasLayer.addTo(map);
+  else map.removeLayer(camarasLayer);
+  const btn = $('btn-camaras');
+  if (btn) btn.style.opacity = showCamaras ? '1' : '0.4';
+}
+
 // ── Init ──────────────────────────────────────────────────────
 (async function init() {
   await loadComunas();
+  await loadCamaras();
   try {
     const [s, dataResp] = await Promise.all([
       fetch('/status').then(r => r.json()),
