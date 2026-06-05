@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Análisis de Siniestralidad de Motos — Cali, Colombia</title>
+  <title>Análisis de Accidentes de Motos — Cali, Colombia</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
@@ -17,7 +17,7 @@
     <div class="header-left">
       <span class="header-icon">🏍️</span>
       <div class="header-title">
-        <h1>Análisis de Siniestralidad de Motos</h1>
+        <h1>Análisis de Accidentes de Motos</h1>
         <p>Cali, Colombia — Sistema de Análisis Geoespacial</p>
       </div>
     </div>
@@ -102,6 +102,13 @@
               <div class="stat-sub" id="stat-top-tipo">Sin datos</div>
             </div>
           </div>
+          <div class="stat-card blue">
+            <span class="stat-icon">📷</span>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-camaras">—</div>
+              <div class="stat-label">Cámaras (operando / total)</div>
+            </div>
+          </div>
 
           <h4 class="section-title">Top 5 Comunas Críticas</h4>
           <ul class="top5-list" id="top5-list">
@@ -150,7 +157,7 @@
             </select>
           </div>
           <div class="filter-group">
-            <label>Tipo de siniestro</label>
+            <label>Tipo de accidente</label>
             <select id="filter-tipo">
               <option value="">Todos los tipos</option>
             </select>
@@ -180,6 +187,7 @@
         <button class="map-btn active" id="btn-heat">🔥 Calor</button>
         <button class="map-btn" id="btn-markers">📍 Marcadores</button>
         <button class="map-btn" id="btn-comunas">🗺️ Comunas</button>
+        <button class="map-btn active" id="btn-camaras" onclick="toggleCamaras()">📷 Cámaras</button>
         <button class="map-btn" id="btn-center">⊙ Centrar</button>
       </div>
 
@@ -196,7 +204,7 @@
       <div class="no-data-msg" id="no-data-msg">
         <div class="big-icon">🗺️</div>
         <h3>Cargue un archivo CSV</h3>
-        <p>Los siniestros de motos aparecerán aquí</p>
+        <p>Los accidentes de motos aparecerán aquí</p>
       </div>
 
       <div class="loading-overlay" id="loading-overlay">
